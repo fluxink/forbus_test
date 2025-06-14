@@ -1,4 +1,4 @@
-import { Button, Card, CardActions, CardContent, Typography } from "@mui/material"
+import { Box, Button, Card, CardActions, CardContent, Typography } from "@mui/material"
 import { addUserJoke, removeJoke, replaceJoke } from "./jokesSlice"
 import { useLazyGetRandomJokeQuery } from "./jokesApiSlice"
 import { type Joke } from "./types"
@@ -14,10 +14,8 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
     const [getRandomJoke] = useLazyGetRandomJokeQuery();
 
     const handleAdd = () => {
-        // Генерируем новый ID для пользовательской шутки
         const userJoke: Joke = {
             ...joke,
-            id: Date.now() + Math.random() // Простой способ генерации уникального ID
         };
         dispatch(addUserJoke(userJoke));
     };
@@ -28,10 +26,6 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
 
     const handleRefresh = async () => {
         try {
-            // Сначала удаляем текущую шутку
-            dispatch(removeJoke(joke.id));
-
-            // Затем получаем новую случайную шутку
             const newJoke = await getRandomJoke(undefined).unwrap();
 
             // Заменяем старую шутку новой
@@ -44,19 +38,42 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
     };
 
     return (
-        <Card>
+        <Card
+            sx={{
+                '& .card-actions': {
+                    opacity: 0,
+                    transition: 'opacity 0.3s ease-in-out'
+                },
+                '&:hover .card-actions': {
+                    opacity: 1
+                }
+            }}
+        >
             <CardContent>
-                <Typography variant="h5" >
-                    {joke.type}
-                </Typography>
-                <Typography variant="body1" >
-                    {joke.setup}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: "bold" }} >
+                            Type:
+                        </Typography>
+                        <Typography variant="subtitle1" >
+                            {`${joke.type.charAt(0).toUpperCase()}${joke.type.slice(1)}`}
+                        </Typography>
+                    </Box>
+                    <Typography variant="subtitle2" component="div">
+                        ID: {joke.id}
+                    </Typography>
+                </Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Setup:</Typography>
+                <Box sx={{ mb: 1, height: '70px', overflow: 'hidden' }}>
+                    <Typography variant="body1">
+                        {joke.setup}
+                    </Typography>
+                </Box>
                 <Typography variant="body2" color="textSecondary">
                     {joke.punchline}
                 </Typography>
             </CardContent>
-            <CardActions>
+            <CardActions className="card-actions">
                 <Button
                     size="small"
                     color="error"
@@ -74,7 +91,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                 <Button
                     size="small"
                     color="secondary"
-                    onClick={void handleRefresh}
+                    onClick={() => void handleRefresh()}
                 >
                     Refresh
                 </Button>

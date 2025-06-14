@@ -13,7 +13,7 @@ export const Jokes = () => {
 
     // Получаем первые 10 шуток при загрузке
     const { data: initialJokes, isLoading, error: apiError } = useGetTenJokesQuery(undefined);
-    const [loadMoreJokes, { isLoading: isLoadingMore }] = useLazyGetTenJokesQuery();
+    const [loadMoreJokes, { isFetching: isLoadingMore, }] = useLazyGetTenJokesQuery();
 
     // Инициализация при загрузке компонента
     useEffect(() => {
@@ -98,7 +98,7 @@ export const Jokes = () => {
         <Container maxWidth="lg">
             <Box py={4}>
                 <Typography variant="h3" component="h1" gutterBottom align="center">
-                    Коллекция шуток
+                    Jokes collection <img src="https://media.tenor.com/3XPAqt7B2S8AAAAj/g%C3%BClmek.gif" width="50" />
                 </Typography>
 
                 {error && (
@@ -120,9 +120,9 @@ export const Jokes = () => {
                         variant="contained"
                         size="large"
                         onClick={() => void handleLoadMore()}
-                        disabled={isLoadingMore}
+                        loading={isLoadingMore}
                     >
-                        {isLoadingMore ? <CircularProgress size={24} /> : 'Загрузить еще'}
+                        Load more
                     </Button>
                 </Box>
             </Box>
