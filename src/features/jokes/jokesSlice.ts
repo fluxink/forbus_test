@@ -141,10 +141,9 @@ export const jokesSlice = createSlice({
         },
         addUserJoke: (state, action: PayloadAction<Joke>) => {
             // Проверяем на дубликаты перед добавлением
-            const existsInJokes = state.jokes.some(joke => joke.id === action.payload.id);
             const existsInUserJokes = state.userJokes.some(joke => joke.id === action.payload.id);
 
-            if (!existsInJokes && !existsInUserJokes) {
+            if (!existsInUserJokes) {
                 state.userJokes.push(action.payload);
                 saveJokesToStorage(state.userJokes);
             }

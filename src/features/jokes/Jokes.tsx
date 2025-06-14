@@ -27,7 +27,14 @@ export const Jokes = () => {
             const remainingSlots = Math.max(0, 10 - userJokes.length);
 
             if (remainingSlots > 0) {
-                const apiJokesToAdd = initialJokes.slice(0, remainingSlots);
+                const existingIds = new Set(userJokes.map(joke => joke.id));
+                
+                const uniqueApiJokes = initialJokes.filter(
+                    (joke: Joke) => !existingIds.has(joke.id)
+                );
+                
+                // Берем только нужное количество уникальных шуток
+                const apiJokesToAdd = uniqueApiJokes.slice(0, remainingSlots);
                 combinedJokes.push(...apiJokesToAdd);
             }
 
@@ -38,7 +45,7 @@ export const Jokes = () => {
     // Обработка ошибок
     useEffect(() => {
         if (apiError) {
-            dispatch(setError('Ошибка при загрузке шуток'));
+            dispatch(setError('Error loading jokes from API'));
         }
     }, [apiError, dispatch]);
 
@@ -70,21 +77,21 @@ export const Jokes = () => {
                 uniqueFromCurrentRequest.forEach(joke => existingIds.add(joke.id));
 
                 console.log(
-                    `Попытка ${attempts.toString()}: получено ${result.length.toString()} шуток, ` +
-                    `из них уникальных: ${uniqueFromCurrentRequest.length.toString()}, ` +
-                    `всего уникальных: ${newUniqueJokes.length.toString()}`
+                    `Attempt ${attempts.toString()}: received ${result.length.toString()} jokes, ` +
+                    `of which unique: ${uniqueFromCurrentRequest.length.toString()}, ` +
+                    `total unique: ${newUniqueJokes.length.toString()}`
                 );
             }
 
             if (newUniqueJokes.length > 0) {
                 dispatch(addJokes(newUniqueJokes));
             } else {
-                dispatch(setError('Не удалось загрузить новые уникальные шутки'));
+                dispatch(setError('Could not load more unique jokes'));
             }
 
         } catch (error) {
-            dispatch(setError('Ошибка при загрузке дополнительных шуток'));
-            console.error('Ошибка загрузки:', error);
+            dispatch(setError('Error loading more jokes'));
+            console.error('Error loading:', error);
         }
     }, [dispatch, jokes, loadMoreJokes]);
 

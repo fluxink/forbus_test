@@ -1,9 +1,10 @@
-import { Box, Button, Card, CardActions, CardContent, Typography } from "@mui/material"
+import { Box, Button, Card, CardActions, CardContent, Typography, Chip } from "@mui/material"
 import { addUserJoke, removeJoke, replaceJokeWithUnique } from "./jokesSlice"
 import { useLazyGetRandomJokeQuery } from "./jokesApiSlice"
 import { type Joke } from "./types"
-import { useAppDispatch } from "../../app/hooks"
+import { useAppDispatch, useAppSelector } from "../../app/hooks"
 import { useState } from "react"
+import { type RootState } from "../../app/store"
 
 
 type JokeCardProps = {
@@ -12,9 +13,13 @@ type JokeCardProps = {
 
 export const JokeCard = ({ joke }: JokeCardProps) => {
     const dispatch = useAppDispatch();
+    const { userJokes } = useAppSelector((state: RootState) => state.jokes);
     const [getRandomJoke] = useLazyGetRandomJokeQuery();
     const [refreshError, setRefreshError] = useState<string | null>(null);
     const [isReplacing, setIsReplacing] = useState(false);
+
+    // Проверяем, сохранена ли шутка в localStorage
+    const isSaved = userJokes.some(userJoke => userJoke.id === joke.id);
 
     const handleAdd = () => {
         const userJoke: Joke = {
@@ -52,9 +57,11 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
     return (
         <Card
             sx={{
-                height: '310px', // Фиксированная высота карточки
+                height: '310px',
                 display: 'flex',
                 flexDirection: 'column',
+                border: isSaved ? '2px solid #4caf50' : '1px solid rgba(0, 0, 0, 0.12)',
+                boxShadow: isSaved ? '0 4px 8px rgba(76, 175, 80, 0.2)' : 1,
                 '& .card-actions': {
                     opacity: 0,
                     transition: 'opacity 0.3s ease-in-out'
@@ -73,13 +80,21 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                 overflow: 'hidden'
             }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: "bold" }} >
                             Type:
                         </Typography>
                         <Typography variant="subtitle1" >
                             {`${joke.type.charAt(0).toUpperCase()}${joke.type.slice(1)}`}
                         </Typography>
+                        {isSaved && (
+                            <Chip 
+                                label="Saved" 
+                                size="small" 
+                                color="success" 
+                                sx={{ ml: 1 }}
+                            />
+                        )}
                     </Box>
                     <Typography variant="subtitle2" component="div">
                         ID: {joke.id}
@@ -145,9 +160,9 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="primary"
                     onClick={handleAdd}
-                    disabled={isReplacing}
+                    disabled={isReplacing || isSaved}
                 >
-                    Add
+                    {isSaved ? 'Saved' : 'Add'}
                 </Button>
                 <Button
                     size="small"
