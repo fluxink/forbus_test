@@ -21,6 +21,9 @@ const saveJokesToStorage = (jokes: Joke[]) => {
     }
 };
 
+// Set для отслеживания ID шуток, которые сейчас используются в активных заменах
+const pendingReplacementIds = new Set<number>();
+
 // Async thunk для замены шутки с проверкой уникальности
 export const replaceJokeWithUnique = createAsyncThunk(
     'jokes/replaceJokeWithUnique',
@@ -28,8 +31,6 @@ export const replaceJokeWithUnique = createAsyncThunk(
         { oldId, apiCall }: { oldId: number; apiCall: () => Promise<{ data: Joke }> },
         { getState, dispatch, rejectWithValue }
     ) => {
-        const state = getState() as RootState;
-        const allJokes = [...state.jokes.jokes, ...state.jokes.userJokes];
         const maxAttempts = 5;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -37,15 +38,40 @@ export const replaceJokeWithUnique = createAsyncThunk(
                 const result = await apiCall();
                 const newJoke = result.data;
 
-                // Проверяем, существует ли уже такая шутка
-                const isDuplicate = allJokes.some(existingJoke => existingJoke.id === newJoke.id);
+                // Получаем актуальное состояние
+                const state = getState() as RootState;
+                const allJokes = [...state.jokes.jokes, ...state.jokes.userJokes];
+
+                // Проверяем, существует ли уже такая шутка или используется в другой активной замене
+                const isDuplicate = allJokes.some(existingJoke => existingJoke.id === newJoke.id) ||
+                    pendingReplacementIds.has(newJoke.id);
 
                 if (!isDuplicate) {
-                    dispatch(replaceJoke({ oldId, newJoke }));
-                    return { success: true, joke: newJoke };
+                    // Резервируем ID новой шутки
+                    pendingReplacementIds.add(newJoke.id);
+
+                    try {
+                        dispatch(replaceJoke({ oldId, newJoke }));
+                        return { success: true, joke: newJoke };
+                    } finally {
+                        // Освобождаем ID после замены
+                        pendingReplacementIds.delete(newJoke.id);
+                    }
                 }
-            } catch {
-                return rejectWithValue('Error fetching new joke');
+            } catch (error) {
+
+                // Проверяем статус ошибки для API ошибок
+                if (error && typeof error === 'object' && 'status' in error && 'error' in error) {
+                    const apiError = error as { status: string; error: string };
+
+                    // Обработка FETCH_ERROR
+                    if (apiError.status === 'FETCH_ERROR') {
+                        return rejectWithValue('Network error. Please check your internet connection.');
+                    }
+                }
+
+                // Для остальных ошибок продолжаем попытки
+                continue;
             }
         }
 
@@ -74,8 +100,14 @@ export const jokesSlice = createSlice({
             state.jokes.push(...newJokes);
         },
         addUserJoke: (state, action: PayloadAction<Joke>) => {
-            state.userJokes.push(action.payload);
-            saveJokesToStorage(state.userJokes);
+            // Проверяем на дубликаты перед добавлением
+            const existsInJokes = state.jokes.some(joke => joke.id === action.payload.id);
+            const existsInUserJokes = state.userJokes.some(joke => joke.id === action.payload.id);
+
+            if (!existsInJokes && !existsInUserJokes) {
+                state.userJokes.push(action.payload);
+                saveJokesToStorage(state.userJokes);
+            }
         },
         removeJoke: (state, action: PayloadAction<number>) => {
             const jokeId = action.payload;
@@ -95,7 +127,16 @@ export const jokesSlice = createSlice({
             const jokeIndex = state.jokes.findIndex(joke => joke.id === oldId);
 
             if (jokeIndex !== -1) {
-                state.jokes[jokeIndex] = newJoke;
+                // Дополнительная проверка на уникальность перед заменой
+                const isDuplicate = state.jokes.some((joke, index) =>
+                    joke.id === newJoke.id && index !== jokeIndex
+                ) || state.userJokes.some(joke => joke.id === newJoke.id);
+
+                if (!isDuplicate) {
+                    state.jokes[jokeIndex] = newJoke;
+                } else {
+                    console.warn(`Попытка замены на дубликат: ${newJoke.id.toString()}`);
+                }
             }
         },
         setLoading: (state, action: PayloadAction<boolean>) => {

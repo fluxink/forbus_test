@@ -12,8 +12,9 @@ type JokeCardProps = {
 
 export const JokeCard = ({ joke }: JokeCardProps) => {
     const dispatch = useAppDispatch();
-    const [getRandomJoke, { isFetching }] = useLazyGetRandomJokeQuery();
+    const [getRandomJoke] = useLazyGetRandomJokeQuery();
     const [refreshError, setRefreshError] = useState<string | null>(null);
+    const [isReplacing, setIsReplacing] = useState(false);
 
     const handleAdd = () => {
         const userJoke: Joke = {
@@ -27,18 +28,24 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
     };
 
     const handleRefresh = async () => {
+        if (isReplacing) return;
+
         setRefreshError(null);
-        
+        setIsReplacing(true);
+
         try {
-            await dispatch(replaceJokeWithUnique({ 
-                oldId: joke.id, 
+            await dispatch(replaceJokeWithUnique({
+                oldId: joke.id,
                 apiCall: async () => {
                     const joke = await getRandomJoke(undefined).unwrap();
                     return { data: joke };
                 }
             })).unwrap();
         } catch (error) {
-            setRefreshError(error as string);
+            const errorMessage = error as string;
+            setRefreshError(errorMessage);
+        } finally {
+            setIsReplacing(false);
         }
     };
 
@@ -55,7 +62,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                 '&:hover .card-actions': {
                     opacity: 1
                 },
-                filter: isFetching ? 'blur(2px)' : 'none',
+                filter: isReplacing ? 'blur(2px)' : 'none',
                 transition: 'filter 0.3s ease-in-out'
             }}
         >
@@ -130,7 +137,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="error"
                     onClick={handleDelete}
-                    disabled={isFetching}
+                    disabled={isReplacing}
                 >
                     Delete
                 </Button>
@@ -138,7 +145,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="primary"
                     onClick={handleAdd}
-                    disabled={isFetching}
+                    disabled={isReplacing}
                 >
                     Add
                 </Button>
@@ -146,9 +153,9 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="secondary"
                     onClick={() => void handleRefresh()}
-                    disabled={isFetching}
+                    disabled={isReplacing}
                 >
-                    Refresh
+                    {isReplacing ? 'Replacing...' : 'Refresh'}
                 </Button>
             </CardActions>
         </Card>
