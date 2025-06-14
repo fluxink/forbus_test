@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Box, Button, Container, Grid, Typography, CircularProgress, Alert } from '@mui/material';
 import { JokeCard } from './JokeCard';
 import { useGetTenJokesQuery, useLazyGetTenJokesQuery } from './jokesApiSlice';
@@ -15,9 +15,13 @@ export const Jokes = () => {
     const { data: initialJokes, isLoading, error: apiError } = useGetTenJokesQuery(undefined);
     const [loadMoreJokes, { isFetching: isLoadingMore, }] = useLazyGetTenJokesQuery();
 
+    const initializationRef = useRef(false);
+
     // Инициализация при загрузке компонента
     useEffect(() => {
-        if (initialJokes && jokes.length === 0) {
+        if (initialJokes && jokes.length === 0 && !initializationRef.current) {
+            initializationRef.current = true;
+            
             // Объединяем пользовательские шутки с полученными из API
             const combinedJokes = [...userJokes];
             const remainingSlots = Math.max(0, 10 - userJokes.length);

@@ -2,13 +2,51 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { type Joke, type JokesState } from './types';
 import type { RootState } from '../../app/store';
 
-// Утилиты для работы с localStorage
+
+const isValidJoke = (obj: unknown): obj is Joke => {
+    return (
+        obj !== null &&
+        obj !== undefined &&
+        typeof obj === 'object' &&
+        'id' in obj &&
+        'type' in obj &&
+        'setup' in obj &&
+        'punchline' in obj &&
+        typeof obj.id === 'number' &&
+        typeof obj.type === 'string' &&
+        typeof obj.setup === 'string' &&
+        typeof obj.punchline === 'string'
+    );
+};
+
 const loadJokesFromStorage = (): Joke[] => {
     try {
         const storedJokes = localStorage.getItem('userJokes');
-        const parsedJokes = storedJokes ? JSON.parse(storedJokes) as Joke[] : [];
-        return parsedJokes;
+        if (!storedJokes) return [];
+        const parsedData: unknown = JSON.parse(storedJokes);
+
+        if (!Array.isArray(parsedData)) {
+            console.warn('Invalid userJokes format in localStorage');
+            localStorage.removeItem('userJokes');
+            return [];
+        }
+
+        // Filter out invalid jokes and log warnings
+        const validJokes = parsedData.filter((item, index) => {
+            if (!isValidJoke(item)) {
+                console.warn(`Invalid joke at index ${index.toString()} in localStorage:`, item);
+                return false;
+            }
+            return true;
+        }) as Joke[];
+
+        if (validJokes.length !== parsedData.length) {
+            saveJokesToStorage(validJokes);
+        }
+
+        return validJokes;
     } catch {
+        console.warn('Failed to load jokes from localStorage');
         return [];
     }
 };
@@ -17,7 +55,7 @@ const saveJokesToStorage = (jokes: Joke[]) => {
     try {
         localStorage.setItem('userJokes', JSON.stringify(jokes));
     } catch {
-        // Игнорируем ошибки localStorage
+        console.warn('Failed to save jokes to localStorage');
     }
 };
 
@@ -47,7 +85,6 @@ export const replaceJokeWithUnique = createAsyncThunk(
                     pendingReplacementIds.has(newJoke.id);
 
                 if (!isDuplicate) {
-                    // Резервируем ID новой шутки
                     pendingReplacementIds.add(newJoke.id);
 
                     try {
@@ -67,6 +104,9 @@ export const replaceJokeWithUnique = createAsyncThunk(
                     // Обработка FETCH_ERROR
                     if (apiError.status === 'FETCH_ERROR') {
                         return rejectWithValue('Network error. Please check your internet connection.');
+                    }
+                    if (apiError.status === 'TIMEOUT_ERROR') {
+                        return rejectWithValue('Request timed out. Please try again.');
                     }
                 }
 
@@ -135,7 +175,7 @@ export const jokesSlice = createSlice({
                 if (!isDuplicate) {
                     state.jokes[jokeIndex] = newJoke;
                 } else {
-                    console.warn(`Попытка замены на дубликат: ${newJoke.id.toString()}`);
+                    console.warn(`Attempt to replace duplicate: ${newJoke.id.toString()}`);
                 }
             }
         },
