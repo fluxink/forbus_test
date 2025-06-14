@@ -1,8 +1,9 @@
 import { Box, Button, Card, CardActions, CardContent, Typography } from "@mui/material"
-import { addUserJoke, removeJoke, replaceJoke } from "./jokesSlice"
+import { addUserJoke, removeJoke, replaceJokeWithUnique } from "./jokesSlice"
 import { useLazyGetRandomJokeQuery } from "./jokesApiSlice"
 import { type Joke } from "./types"
 import { useAppDispatch } from "../../app/hooks"
+import { useState } from "react"
 
 
 type JokeCardProps = {
@@ -11,7 +12,8 @@ type JokeCardProps = {
 
 export const JokeCard = ({ joke }: JokeCardProps) => {
     const dispatch = useAppDispatch();
-    const [getRandomJoke] = useLazyGetRandomJokeQuery();
+    const [getRandomJoke, { isFetching }] = useLazyGetRandomJokeQuery();
+    const [refreshError, setRefreshError] = useState<string | null>(null);
 
     const handleAdd = () => {
         const userJoke: Joke = {
@@ -25,33 +27,46 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
     };
 
     const handleRefresh = async () => {
+        setRefreshError(null);
+        
         try {
-            const newJoke = await getRandomJoke(undefined).unwrap();
-
-            // Заменяем старую шутку новой
-            dispatch(replaceJoke({ oldId: joke.id, newJoke }));
+            await dispatch(replaceJokeWithUnique({ 
+                oldId: joke.id, 
+                apiCall: async () => {
+                    const joke = await getRandomJoke(undefined).unwrap();
+                    return { data: joke };
+                }
+            })).unwrap();
         } catch (error) {
-            console.error('Ошибка при обновлении шутки:', error);
-            // Если произошла ошибка, можно вернуть старую шутку обратно
-            // или показать уведомление об ошибке
+            setRefreshError(error as string);
         }
     };
 
     return (
         <Card
             sx={{
+                height: '310px', // Фиксированная высота карточки
+                display: 'flex',
+                flexDirection: 'column',
                 '& .card-actions': {
                     opacity: 0,
                     transition: 'opacity 0.3s ease-in-out'
                 },
                 '&:hover .card-actions': {
                     opacity: 1
-                }
+                },
+                filter: isFetching ? 'blur(2px)' : 'none',
+                transition: 'filter 0.3s ease-in-out'
             }}
         >
-            <CardContent>
+            <CardContent sx={{
+                flexGrow: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+            }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex' }}>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: "bold" }} >
                             Type:
                         </Typography>
@@ -63,21 +78,59 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                         ID: {joke.id}
                     </Typography>
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Setup:</Typography>
-                <Box sx={{ mb: 1, height: '70px', overflow: 'hidden' }}>
-                    <Typography variant="body1">
-                        {joke.setup}
+                <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+                        Setup:
+                    </Typography>
+                    <Box sx={{
+                        height: '80px',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        textOverflow: 'ellipsis'
+                    }}>
+                        <Typography variant="body1">
+                            {joke.setup}
+                        </Typography>
+                    </Box>
+                </Box>
+                <Box sx={{
+                    flexGrow: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0
+                }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+                        Punchline:
+                    </Typography>
+                    <Box sx={{
+                        flexGrow: 1,
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: 'vertical',
+                        textOverflow: 'ellipsis'
+                    }}>
+                        <Typography variant="body2" color="textSecondary">
+                            {joke.punchline}
+                        </Typography>
+                    </Box>
+                </Box>
+            </CardContent>
+            {refreshError && (
+                <Box sx={{ mt: 1, px: 2 }}>
+                    <Typography variant="caption" color="error">
+                        {refreshError}
                     </Typography>
                 </Box>
-                <Typography variant="body2" color="textSecondary">
-                    {joke.punchline}
-                </Typography>
-            </CardContent>
+            )}
             <CardActions className="card-actions">
                 <Button
                     size="small"
                     color="error"
                     onClick={handleDelete}
+                    disabled={isFetching}
                 >
                     Delete
                 </Button>
@@ -85,6 +138,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="primary"
                     onClick={handleAdd}
+                    disabled={isFetching}
                 >
                     Add
                 </Button>
@@ -92,6 +146,7 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
                     size="small"
                     color="secondary"
                     onClick={() => void handleRefresh()}
+                    disabled={isFetching}
                 >
                     Refresh
                 </Button>

@@ -1,5 +1,6 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { type Joke, type JokesState } from './types';
+import type { RootState } from '../../app/store';
 
 // Утилиты для работы с localStorage
 const loadJokesFromStorage = (): Joke[] => {
@@ -19,6 +20,38 @@ const saveJokesToStorage = (jokes: Joke[]) => {
         // Игнорируем ошибки localStorage
     }
 };
+
+// Async thunk для замены шутки с проверкой уникальности
+export const replaceJokeWithUnique = createAsyncThunk(
+    'jokes/replaceJokeWithUnique',
+    async (
+        { oldId, apiCall }: { oldId: number; apiCall: () => Promise<{ data: Joke }> },
+        { getState, dispatch, rejectWithValue }
+    ) => {
+        const state = getState() as RootState;
+        const allJokes = [...state.jokes.jokes, ...state.jokes.userJokes];
+        const maxAttempts = 5;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                const result = await apiCall();
+                const newJoke = result.data;
+
+                // Проверяем, существует ли уже такая шутка
+                const isDuplicate = allJokes.some(existingJoke => existingJoke.id === newJoke.id);
+
+                if (!isDuplicate) {
+                    dispatch(replaceJoke({ oldId, newJoke }));
+                    return { success: true, joke: newJoke };
+                }
+            } catch {
+                return rejectWithValue('Error fetching new joke');
+            }
+        }
+
+        return rejectWithValue('Could not find a unique joke after multiple attempts');
+    }
+);
 
 const initialState: JokesState = {
     jokes: [],
@@ -46,10 +79,10 @@ export const jokesSlice = createSlice({
         },
         removeJoke: (state, action: PayloadAction<number>) => {
             const jokeId = action.payload;
-            
+
             // Удаляем из основного списка
             state.jokes = state.jokes.filter(joke => joke.id !== jokeId);
-            
+
             // Удаляем из пользовательских шуток если есть
             const userJokeIndex = state.userJokes.findIndex(joke => joke.id === jokeId);
             if (userJokeIndex !== -1) {
@@ -60,7 +93,7 @@ export const jokesSlice = createSlice({
         replaceJoke: (state, action: PayloadAction<{ oldId: number; newJoke: Joke }>) => {
             const { oldId, newJoke } = action.payload;
             const jokeIndex = state.jokes.findIndex(joke => joke.id === oldId);
-            
+
             if (jokeIndex !== -1) {
                 state.jokes[jokeIndex] = newJoke;
             }
