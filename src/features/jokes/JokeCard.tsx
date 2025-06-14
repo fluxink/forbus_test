@@ -2,24 +2,20 @@ import { Box, Button, Card, CardActions, CardContent, Typography, Chip } from "@
 import { addUserJoke, removeJoke, replaceJokeWithUnique } from "./jokesSlice"
 import { useLazyGetRandomJokeQuery } from "./jokesApiSlice"
 import { type Joke } from "./types"
-import { useAppDispatch, useAppSelector } from "../../app/hooks"
-import { useState } from "react"
-import { type RootState } from "../../app/store"
-
+import { useAppDispatch } from "../../app/hooks"
+import { useState, memo } from "react"
+import { useIsJokeSaved } from './hooks'
 
 type JokeCardProps = {
     joke: Joke;
 }
 
-export const JokeCard = ({ joke }: JokeCardProps) => {
+export const JokeCard = memo(({ joke }: JokeCardProps) => {
     const dispatch = useAppDispatch();
-    const { userJokes } = useAppSelector((state: RootState) => state.jokes);
+    const isSaved = useIsJokeSaved(joke.id);
     const [getRandomJoke] = useLazyGetRandomJokeQuery();
     const [refreshError, setRefreshError] = useState<string | null>(null);
     const [isReplacing, setIsReplacing] = useState(false);
-
-    // Проверяем, сохранена ли шутка в localStorage
-    const isSaved = userJokes.some(userJoke => userJoke.id === joke.id);
 
     const handleAdd = () => {
         const userJoke: Joke = {
@@ -175,4 +171,6 @@ export const JokeCard = ({ joke }: JokeCardProps) => {
             </CardActions>
         </Card>
     )
-}
+});
+
+JokeCard.displayName = 'JokeCard';

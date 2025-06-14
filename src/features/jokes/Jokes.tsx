@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { Box, Button, Container, Grid, Typography, CircularProgress, Alert } from '@mui/material';
 import { JokeCard } from './JokeCard';
 import { useGetTenJokesQuery, useLazyGetTenJokesQuery } from './jokesApiSlice';
 import { setJokes, addJokes, setError } from './jokesSlice';
-import { type RootState } from '../../app/store';
 import { type Joke } from './types';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { selectJokes, selectUserJokes, selectError } from './selectors';
 
 export const Jokes = () => {
     const dispatch = useAppDispatch();
-    const { jokes, userJokes, error } = useAppSelector((state: RootState) => state.jokes);
+    // Разделяем селекторы для минимизации ререндеров
+    const jokes = useAppSelector(selectJokes);
+    const userJokes = useAppSelector(selectUserJokes);
+    const error = useAppSelector(selectError);
 
     // Получаем первые 10 шуток при загрузке
     const { data: initialJokes, isLoading, error: apiError } = useGetTenJokesQuery(undefined);
@@ -95,6 +98,15 @@ export const Jokes = () => {
         }
     }, [dispatch, jokes, loadMoreJokes]);
 
+    // Мемоизируем рендер карточек - будет пересчитываться только при изменении jokes
+    const jokeCards = useMemo(() => {
+        return jokes.map((joke) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={joke.id}>
+                <JokeCard joke={joke} />
+            </Grid>
+        ));
+    }, [jokes]);
+
     if (isLoading && jokes.length === 0) {
         return (
             <Container>
@@ -119,11 +131,7 @@ export const Jokes = () => {
                 )}
 
                 <Grid container spacing={3}>
-                    {jokes.map((joke) => (
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={joke.id}>
-                            <JokeCard joke={joke} />
-                        </Grid>
-                    ))}
+                    {jokeCards}
                 </Grid>
 
                 <Box display="flex" justifyContent="center" mt={4}>
